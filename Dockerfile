@@ -1,14 +1,15 @@
-FROM python:3.7-alpine
+FROM python:3.7-slim
 
-# Install packages needed to run your application (not build deps)
-# mailcap -- for mime types when serving static files
-# pcre -- for uwsgi
-# postgresql-client -- for running database commands
+# Install packages needed to run your application (not build deps):
+#   mime-support -- for mime types when serving static files
+#   postgresql-client -- for running database commands
+# We need to recreate the /usr/share/man/man{1..8} directories first because they were clobbered by a parent image.
 RUN set -ex \
-	&& apk add --no-cache \
-		mailcap \
-		pcre \
-		postgresql-client
+	&& seq 1 8 | xargs -I{} mkdir -p /usr/share/man/man{} \
+	&& apt-get update && apt-get install -y --no-install-recommends \
+		mime-support \
+		postgresql-client \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Copy in your requirements file
 ADD requirements.txt /requirements.txt
@@ -18,26 +19,15 @@ ADD requirements.txt /requirements.txt
 
 # Install build deps, then run `pip install`, then remove unneeded build deps all in a single step. Correct the path to your production requirements file, if needed.
 RUN set -ex \
-	&& apk add --no-cache --virtual .build-deps \
-		gcc \
-		make \
-		libc-dev \
-		musl-dev \
-		linux-headers \
-		pcre-dev \
-		postgresql-dev \
+	&& BUILD_DEPS="build-essential libpq-dev" \
+	\
+	&& apt-get update && apt-get install -y --no-install-recommends $BUILD_DEPS \
 	&& python3.7 -m venv /venv \
 	&& /venv/bin/pip install -U pip \
-	&& LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt" \
-	&& runDeps="$( \
-		scanelf --needed --nobanner --recursive /venv \
-			| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
-			| sort -u \
-			| xargs -r apk info --installed \
-			| sort -u \
-	)" \
-	&& apk add --virtual .python-rundeps $runDeps \
-	&& apk del .build-deps
+	&& /venv/bin/pip install --no-cache-dir -r /requirements.txt \
+	\
+	&& apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $BUILD_DEPS \
+	&& rm -rf /var/lib/apt/lists/*
 
 # Copy your application code to the container (make sure you create a .dockerignore file if any large files or directories should be excluded)
 RUN mkdir /code/

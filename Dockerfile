@@ -1,8 +1,12 @@
 FROM python:3.5-alpine
 
 # Install packages needed to run your application (not build deps)
+# mailcap -- for mime types when serving static files
+# pcre -- for uwsgi
+# postgresql-client -- for running database commands
 RUN set -ex \
 	&& apk add --no-cache \
+		mailcap \
 		pcre \
 		postgresql-client
 

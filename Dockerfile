@@ -1,4 +1,4 @@
-FROM python:3.5-alpine
+FROM python:3.7-alpine
 
 # Install packages needed to run your application (not build deps)
 # mailcap -- for mime types when serving static files
@@ -26,7 +26,7 @@ RUN set -ex \
 		linux-headers \
 		pcre-dev \
 		postgresql-dev \
-	&& pyvenv /venv \
+	&& python3.7 -m venv /venv \
 	&& /venv/bin/pip install -U pip \
 	&& LIBRARY_PATH=/lib:/usr/lib /bin/sh -c "/venv/bin/pip install --no-cache-dir -r /requirements.txt" \
 	&& runDeps="$( \

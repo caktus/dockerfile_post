@@ -59,4 +59,4 @@ RUN DATABASE_URL='' /venv/bin/python manage.py collectstatic --noinput
 ENTRYPOINT ["/code/docker-entrypoint.sh"]
 
 # Start uWSGI
-CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive", "--static-map", "/static/=/code/static/"]
+CMD ["/venv/bin/uwsgi", "--http-auto-chunked", "--http-keepalive", "--static-map", "/static/=/code/static/", "--static-expires-uri", "/static/.*\\.[a-f0-9]{12,}\\.(css|js|png|jpg|jpeg|gif|ico|woff|ttf|otf|svg|scss|map|txt) 315360000"]

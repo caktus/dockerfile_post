@@ -1,0 +1,4 @@
+Django==2.2rc1
+uwsgi==2.0.18
+dj-database-url==0.5.0
+psycopg2==2.7.7

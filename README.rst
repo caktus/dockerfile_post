@@ -14,8 +14,8 @@ Technical overview
 
 There are many ways to containerize a Python/Django app, no one of which could be considered "the best." That being said, I think the following approach provides a good balance of simplicity, configurability, and container size. The specific tools I'll be using are: `Docker <https://www.docker.com/>`_ (of course), the `python:3.7-slim <https://hub.docker.com/_/python/>`_ Docker image (based on Debian Stretch), and `uWSGI <https://uwsgi-docs.readthedocs.io/>`_.
 
-In a previous version of this post, we used `Alpine Linux <https://alpinelinux.org/>`_ as the base image for this
-Dockerfile. This time, we're switching to a Debian- and glibc-based image, because we found `a workaround <https://github.com/iron-io/dockers/issues/42#issuecomment-290763088>`_ was required for `musl libc <https://www.musl-libc.org/>`_'s ``strftime()`` implementation. The Debian-based "slim" images are still relatively small; the bare-minimum image describe below increase from about 170 MB to 227 MB (~33%) when switching from ``python:3.7-alpine`` to ``python:3.7-slim`` (and updating all the corresponding system packages).
+In a previous version of this post, I used `Alpine Linux <https://alpinelinux.org/>`_ as the base image for this
+Dockerfile. This time, I'm switching to a Debian- and glibc-based image, because I found `an inconvenient workaround <https://github.com/iron-io/dockers/issues/42#issuecomment-290763088>`_ was required for `musl libc <https://www.musl-libc.org/>`_'s ``strftime()`` implementation. The Debian-based "slim" images are still relatively small; the bare-minimum image described below increase from about 170 MB to 227 MB (~33%) when switching from ``python:3.7-alpine`` to ``python:3.7-slim`` (and updating all the corresponding system packages).
 
 There are many WSGI servers available for Python, and we use both Gunicorn and uWSGI at Caktus. A couple of the benefits of uWSGI are that (1) it's almost entirely configurable through environment variables (which fits well with containers), and (2) it includes `native HTTP support <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_, which can circumvent the need for a separate HTTP server like Apache or Nginx.
 
@@ -147,7 +147,6 @@ My ``deploy.py`` settings file looks like this:
 
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
-
 This bears repeating: This is **not** a production-ready settings file, and you should review `the checklist <https://docs.djangoproject.com/en/dev/howto/deployment/checklist/>`_ in the Django docs (and run ``python manage.py check --deploy --settings=my_project.settings.deploy``) to ensure you've properly secured your production settings file.
 
 
@@ -198,13 +197,11 @@ Make sure this file is executable, i.e.:
 
     chmod a+x docker-entrypoint.sh
 
-
 Next, uncomment the following line to your ``Dockerfile``, just above the ``CMD`` statement:
 
 .. code-block:: docker
 
     ENTRYPOINT ["/code/docker-entrypoint.sh"]
-
 
 This will (a) make sure a database is available (usually only needed when used with Docker Compose) and (b) run outstanding migrations, if any, if the ``DJANGO_MANAGEPY_MIGRATE`` is set to ``on`` in your environment. Even if you add this entrypoint script as-is, you could still choose to run ``migrate`` or ``collectstatic`` in separate steps in your deployment before releasing the new container. The only reason you might not want to do this is if your application is highly sensitive to container start-up time, or if you want to avoid any database calls as the container starts up (e.g., for local testing). If you do rely on these commands being run during container start-up, be sure to set the relevant variables in your container's environment.
 
@@ -242,7 +239,6 @@ To run a complete copy of production services locally, you can use `Docker Compo
         ports:
           - "8000:8000"
 
-
 Copy this into a file named ``docker-compose.yml`` in the same directory as your ``Dockerfile``, and then run:
 
 .. code-block:: bash
@@ -279,7 +275,7 @@ To avoid Django's ``Invalid HTTP_HOST header`` errors (and prevent any such spur
 Summary
 -------
 
-That concludes this high-level introduction to containerizing your Python/Django app for hosting on AWS Elastic Beanstalk (EB), Elastic Container Service (ECS), or elsewhere. Each application and Dockerfile will be slightly different, but I hope this provides a good starting point for your containers. Shameless plug: If you're looking for a simple (and at least temporarily free) way to test your Docker containers on AWS using an Elastic Beanstalk Multicontainer Docker environment or the Elastic Container Service, checkout Caktus' very own `AWS Web Stacks <https://github.com/caktus/aws-web-stacks>`_. Good luck!
+That concludes this high-level introduction to containerizing your Python/Django app for hosting on AWS Elastic Beanstalk (EB), Elastic Container Service (ECS), or elsewhere. Each application and Dockerfile will be slightly different, but I hope this provides a good starting point for your containers. Shameless plug: If you're looking for a simple (and at least temporarily free) way to test your Docker containers on AWS using an Elastic Beanstalk Multicontainer Docker environment or the Elastic Container Service, check out Caktus' very own `AWS Web Stacks <https://github.com/caktus/aws-web-stacks>`_. Good luck!
 
 **Update 1 (March 31, 2017):** There is no need for ``depends_on`` in container definitions that already include ``links``. This has been removed. Thanks Anderson Lima for the tip!
 
@@ -287,4 +283,4 @@ That concludes this high-level introduction to containerizing your Python/Django
 
 **Update 3 (May 30, 2017):** uWSGI contains a lot of optimizations for running many apps from the same uWSGI process. These optimizations aren't really needed when running a single app in a Docker container, and can `cause issues <https://discuss.newrelic.com/t/newrelic-agent-produces-system-error/43446/2>`_ when used with certain 3rd-party packages. I've added ``UWSGI_LAZY_APPS=1`` and ``UWSGI_WSGI_ENV_BEHAVIOR=holy`` to the uWSGI configuration to provide a more stable uWSGI experience (the latter will be the default in the next uWSGI release).
 
-**Update 4 (March 29, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version includes a number of other minor improvements, including an accompanying `GitHub repository <https://github.com/tobiasmcnulty/dockerfile_post/>`_.
+**Update 4 (March 29, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version includes a number of other minor improvements, including a less-magical approach to installing (and removing) system dependencies, better-documented uWSGI settings, a list of the requirements and settings you'll need to match this Dockerfile, support for static file serving via uWSGI (including hashed filenames and cache-forever headers), and an accompanying `GitHub repository <https://github.com/tobiasmcnulty/dockerfile_post/>`_.

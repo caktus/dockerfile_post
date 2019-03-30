@@ -8,6 +8,7 @@ A Production-ready Dockerfile for Your Python/Django App
 
 Docker has matured a lot since it was released nearly 4 years ago. We've been watching it closely at Caktus, and have been thrilled by the adoption -- both by the community and by service providers. As a team of Python and Django developers, we're always searching for best of breed deployment tools. Docker is a clear fit for packaging the underlying code for many projects, including the Python and Django apps we build at Caktus.
 
+
 Technical overview
 ------------------
 
@@ -16,7 +17,8 @@ There are many ways to containerize a Python/Django app, no one of which could b
 In a previous version of this post, we used `Alpine Linux <https://alpinelinux.org/>`_ as the base image for this
 Dockerfile. This time, we're switching to a Debian- and glibc-based image, because we found `a workaround <https://github.com/iron-io/dockers/issues/42#issuecomment-290763088>`_ was required for `musl libc <https://www.musl-libc.org/>`_'s ``strftime()`` implementation. The Debian-based "slim" images are still relatively small; the bare-minimum image describe below increase from about 170 MB to 227 MB (~33%) when switching from ``python:3.7-alpine`` to ``python:3.7-slim`` (and updating all the corresponding system packages).
 
-There are many WSGI servers available for Python, and we use both Gunicorn and uWSGI at Caktus. A couple of the benefits of uWSGI are that (1) it's almost entirely configurable through environment variables (which fits well with containers), and (2) it includes `native HTTP support <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_, which can circumvent the need for a separate HTTP server like Apache or Nginx, provided static files are hosted on a 3rd-party CDN such as Amazon S3.
+There are many WSGI servers available for Python, and we use both Gunicorn and uWSGI at Caktus. A couple of the benefits of uWSGI are that (1) it's almost entirely configurable through environment variables (which fits well with containers), and (2) it includes `native HTTP support <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_, which can circumvent the need for a separate HTTP server like Apache or Nginx.
+
 
 The Dockerfile
 --------------
@@ -99,7 +101,6 @@ Without further ado, here's a production-ready ``Dockerfile`` you can use as a s
     # Start uWSGI
     CMD ["/venv/bin/uwsgi", "--show-config"]
 
-
 We extend from the "slim" flavor of the official Docker image for Python 3.7, install a few dependencies for running our application (i.e., that we want to keep in the final version of the image), copy the folder containing our requirements files to the container, and then, in a single line, (a) install the build dependencies needed, (b) ``pip install`` the requirements themselves (edit this line to match the location of your requirements file, if needed), (c) remove the C compiler and any other OS packages no longer needed, and (d) remove the package lists since they're no longer needed. It's important to keep this all on one line so that Docker will cache the entire operation as a single layer.
 
 You'll notice I've only included a minimal set of OS dependencies here. If this is an established production app, you'll most likely need to visit https://packages.debian.org, search for the Debian package names of the OS dependencies you need, including the ``-dev`` supplemental packages as needed, and add them either to ``RUN_DEPS`` or ``BUILD_DEPS`` in your Dockerfile.
@@ -107,6 +108,48 @@ You'll notice I've only included a minimal set of OS dependencies here. If this 
 Next, we copy our application code to the image, set some default environment variables, and run ``collectstatic``. Be sure to change the values for ``DJANGO_SETTINGS_MODULE`` and ``UWSGI_WSGI_FILE`` to the correct paths for your application (note that the former requires a Python package path, while the latter requires a file system path).
 
 Finally, the ``UWSGI_HTTP_AUTO_CHUNKED`` and ``UWSGI_HTTP_KEEPALIVE`` options to uWSGI are needed in the event the container will be hosted behind an Amazon Elastic Load Balancer (ELB), because Django doesn't set a valid ``Content-Length`` header by default, unless the ``ConditionalGetMiddleware`` is enabled. See `the note <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_ at the end of the uWSGI documentation on HTTP support for further detail.
+
+
+Requirements and settings files
+-------------------------------
+
+Production-ready requirements and settings files are outside the scope of this post, but you'll need to include a few things in your requirements file(s) if they're not there already::
+
+    Django>=2.2rc1,<2.3
+    uwsgi>=2.0,<2.1
+    dj-database-url>=0.5,<0.6
+    # Prevent pip from installing the binary wheel for psycopg2; see:
+    # http://initd.org/psycopg/docs/install.html#disabling-wheel-packages-for-psycopg-2-7
+    psycopg2>=2.7,<2.8 --no-binary psycopg2
+
+I haven't pinned these to specific versions here to help future-proof this post somewhat, but you'll likely want to pin these (and other) requirements to specific versions so things don't suddenly start breaking in production. Of course, you don't have to use any of these packages, but you'll need to adjust the corresponding code elsewhere in this post if you don't.
+
+My ``deploy.py`` settings file looks like this:
+
+.. code-block:: python
+
+    import os
+
+    import dj_database_url
+
+    from . import *  # noqa: F403
+
+    # This is NOT a complete production settings file. For more, see:
+    # See https://docs.djangoproject.com/en/dev/howto/deployment/checklist/
+
+    DEBUG = False
+
+    ALLOWED_HOSTS = ['localhost']
+
+    DATABASES['default'] = dj_database_url.config(conn_max_age=600)  # noqa: F405
+
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static')  # noqa: F405
+
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+
+This bears repeating: This is **not** a production-ready settings file, and you should review `the checklist <https://docs.djangoproject.com/en/dev/howto/deployment/checklist/>`_ in the Django docs (and run ``python manage.py check --deploy --settings=my_project.settings.deploy``) to ensure you've properly secured your production settings file.
+
 
 Building and testing the container
 ----------------------------------
@@ -124,6 +167,7 @@ This will go through all the commands in your Dockerfile, and if successful, sto
     docker run -e DATABASE_URL='' -t my-app
 
 This command is merely a smoke test to make sure uWSGI runs, and won't connect to a database or any other external services.
+
 
 Running commands during container start-up
 ------------------------------------------
@@ -148,6 +192,12 @@ As a final step, I recommend creating an ``ENTRYPOINT`` script to run commands a
 
     exec "$@"
 
+Make sure this file is executable, i.e.:
+
+.. code-block:: bash
+
+    chmod a+x docker-entrypoint.sh
+
 
 Next, uncomment the following line to your ``Dockerfile``, just above the ``CMD`` statement:
 
@@ -157,6 +207,7 @@ Next, uncomment the following line to your ``Dockerfile``, just above the ``CMD`
 
 
 This will (a) make sure a database is available (usually only needed when used with Docker Compose) and (b) run outstanding migrations, if any, if the ``DJANGO_MANAGEPY_MIGRATE`` is set to ``on`` in your environment. Even if you add this entrypoint script as-is, you could still choose to run ``migrate`` or ``collectstatic`` in separate steps in your deployment before releasing the new container. The only reason you might not want to do this is if your application is highly sensitive to container start-up time, or if you want to avoid any database calls as the container starts up (e.g., for local testing). If you do rely on these commands being run during container start-up, be sure to set the relevant variables in your container's environment.
+
 
 Creating a production-like environment locally with Docker Compose
 ------------------------------------------------------------------
@@ -206,10 +257,27 @@ This downloads (or builds) and starts the two containers listed above. You can v
 
 If all services launched successfully, you should now be able to access your application at http://localhost:8000/ in a web browser.
 
-Extra: Blocking ``Invalid HTTP_HOST header`` errors with uWSGI
---------------------------------------------------------------
+If you need to debug your application container, a handy way to launch an instance it and poke around is:
+
+.. code-block:: bash
+
+    docker-compose run app /bin/bash
+
+
+Static Files
+------------
+
+You may have noticed that we set up static file serving in uWSGI via the ``UWSGI_STATIC_MAP`` and ``UWSGI_STATIC_EXPIRES_URI`` environment variables. If preferred, you can turn this off and use `Django Whitenoise <http://whitenoise.evans.io/en/stable/>`_ or `copy your static files straight to S3 <https://www.caktusgroup.com/blog/2014/11/10/Using-Amazon-S3-to-store-your-Django-sites-static-and-media-files/>`_.
+
+
+Blocking ``Invalid HTTP_HOST header`` errors with uWSGI
+-------------------------------------------------------
 
 To avoid Django's ``Invalid HTTP_HOST header`` errors (and prevent any such spurious requests from taking up any more CPU cycles than absolutely necessary), you can also configure uWSGI to return an ``HTTP 400`` response immediately without ever invoking your application code. This can be accomplished by uncommenting and customizing the ``UWSGI_ROUTE_HOST`` line in the Dockerfile above.
+
+
+Summary
+-------
 
 That concludes this high-level introduction to containerizing your Python/Django app for hosting on AWS Elastic Beanstalk (EB), Elastic Container Service (ECS), or elsewhere. Each application and Dockerfile will be slightly different, but I hope this provides a good starting point for your containers. Shameless plug: If you're looking for a simple (and at least temporarily free) way to test your Docker containers on AWS using an Elastic Beanstalk Multicontainer Docker environment or the Elastic Container Service, checkout Caktus' very own `AWS Web Stacks <https://github.com/caktus/aws-web-stacks>`_. Good luck!
 

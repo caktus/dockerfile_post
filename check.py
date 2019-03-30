@@ -1,8 +1,11 @@
 "Run some basic tests against the docker-compose app"
+import logging
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+
+logging.basicConfig(level=logging.DEBUG)
 
 BASE_URL = 'http://localhost:8000/'
 
@@ -13,7 +16,7 @@ r = s.get(urljoin(BASE_URL, ''))
 assert r.status_code == 404
 
 # We should still be able to get to the admin
-r = s.get(urljoin(BASE_URL, 'admin'))
+r = s.get(urljoin(BASE_URL, 'admin/'))
 assert r.status_code == 200
 
 # Which, in turn, should have some CSS files we can try to download

@@ -15,7 +15,7 @@ before_install:
   - sudo apt-get install -qy -o Dpkg::Options::="--force-confold" docker-ce coreutils
 
 install:
-  - pip install requests==2.21.0 beautifulsoup4==4.7.1
+  - pip install requests==2.21.0 beautifulsoup4==4.7.1 flake8==3.7.7 isort==4.3.16
 
 before_script:
   - docker-compose up --build -d
@@ -24,6 +24,8 @@ before_script:
 
 script:
   - python3 check.py
+  - flake8
+  - isort --recursive --check-only --diff
 
 after_script:
   - docker-compose logs

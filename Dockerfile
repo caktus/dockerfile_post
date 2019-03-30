@@ -65,6 +65,7 @@ ENV UWSGI_STATIC_MAP="/static/=/code/static/" UWSGI_STATIC_EXPIRES_URI="/static/
 # Deny invalid hosts before they get to Django (uncomment and change to your hostname(s)):
 ENV UWSGI_ROUTE_HOST="^(?!localhost:8000$) break:400"
 
+# Uncomment after creating your docker-entrypoint.sh
 ENTRYPOINT ["/code/docker-entrypoint.sh"]
 
 # Start uWSGI

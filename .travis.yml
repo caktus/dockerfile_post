@@ -1,0 +1,27 @@
+dist: xenial
+language: python
+python:
+  - "3.7"
+services:
+  - docker
+
+env:
+  global:
+    - GREP_TIMEOUT=10
+
+# Update Docker Engine
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install -qy -o Dpkg::Options::="--force-confold" docker-ce coreutils
+
+install:
+  - pip install requests==2.21.0 beautifulsoup4==4.7.1
+
+script:
+  - docker-compose up --build -d
+  - docker-compose ps
+  - timeout $GREP_TIMEOUT grep -m 1 'spawned uWSGI http 1' <(docker-compose logs --follow app 2>&1)
+  - python3 check.py
+
+after_script:
+  - docker-compose logs

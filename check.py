@@ -13,7 +13,7 @@ s = requests.Session()
 
 # uWSGI should return a 400 error for requests with a bad Host header
 r = s.get(urljoin(BASE_URL, ''), headers={'Host': 'badhost.com'})
-assert r.status_code == 400
+assert r.status_code == 400, r.status_code
 # uWSGI just returns an empty response. If the request makes it to Django
 # (which it shouldn't), this will be b'<h1>Bad Request (400)</h1>'.
 assert r.content == b'', r.content

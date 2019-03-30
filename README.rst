@@ -1,3 +1,11 @@
+This is a DRAFT (possibly including untested, yet-to-be released) edits to the blog post published here: https://www.caktusgroup.com/blog/2017/03/14/production-ready-dockerfile-your-python-django-app/
+
+**Have a suggested tweak or fix?** Feel free to submit a PR.
+
+
+A Production-ready Dockerfile for Your Python/Django App
+========================================================
+
 Docker has matured a lot since it was released nearly 4 years ago. We've been watching it closely at Caktus, and have been thrilled by the adoption -- both by the community and by service providers. As a team of Python and Django developers, we're always searching for best of breed deployment tools. Docker is a clear fit for packaging the underlying code for many projects, including the Python and Django apps we build at Caktus.
 
 Technical overview

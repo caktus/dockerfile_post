@@ -6,7 +6,9 @@ This is a DRAFT (possibly including untested, yet-to-be released) edits to the b
 A Production-ready Dockerfile for Your Python/Django App
 ========================================================
 
-Docker has matured a lot since it was released nearly 4 years ago. We've been watching it closely at Caktus, and have been thrilled by the adoption -- both by the community and by service providers. As a team of Python and Django developers, we're always searching for best of breed deployment tools. Docker is a clear fit for packaging the underlying code for many projects, including the Python and Django apps we build at Caktus.
+**Update (April 8, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version includes a number of other minor improvements, including a less-magical approach to installing (and removing) system dependencies, better-documented uWSGI settings, a list of the requirements and settings you'll need to match this Dockerfile, support for static file serving via uWSGI (including hashed filenames and cache-forever headers), and an accompanying `GitHub repository <https://github.com/tobiasmcnulty/dockerfile_post/>`_.
+
+Docker has matured a lot since it was released. We've been watching it closely at Caktus, and have been thrilled by the adoption -- both by the community and by service providers. As a team of Python and Django developers, we're always searching for best of breed deployment tools. Docker is a clear fit for packaging the underlying code for many projects, including the Python and Django apps we build at Caktus.
 
 
 Technical Overview
@@ -103,11 +105,14 @@ Without further ado, here's a production-ready ``Dockerfile`` you can use as a s
 
 We extend from the "slim" flavor of the official Docker image for Python 3.7, install a few dependencies for running our application (i.e., that we want to keep in the final version of the image), copy the folder containing our requirements files to the container, and then, in a single line, (a) install the build dependencies needed, (b) ``pip install`` the requirements themselves (edit this line to match the location of your requirements file, if needed), (c) remove the C compiler and any other OS packages no longer needed, and (d) remove the package lists since they're no longer needed. It's important to keep this all on one line so that Docker will cache the entire operation as a single layer.
 
-You'll notice I only included a minimal set of OS dependencies here. If this is an established production app, you'll most likely need to visit https://packages.debian.org, search for the Debian package names of the OS dependencies you need, including the ``-dev`` supplemental packages as needed, and add them either to ``RUN_DEPS`` or ``BUILD_DEPS`` in your Dockerfile.
-
 Next, we copy our application code to the image, set some default environment variables, and run ``collectstatic``. Be sure to change the values for ``DJANGO_SETTINGS_MODULE`` and ``UWSGI_WSGI_FILE`` to the correct paths for your application (note that the former requires a Python package path, while the latter requires a file system path).
 
-Finally, the ``UWSGI_HTTP_AUTO_CHUNKED`` and ``UWSGI_HTTP_KEEPALIVE`` options to uWSGI are needed in the event the container will be hosted behind an Amazon Elastic Load Balancer (ELB), because Django doesn't set a valid ``Content-Length`` header by default, unless the ``ConditionalGetMiddleware`` is enabled. See `the note <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_ at the end of the uWSGI documentation on HTTP support for further detail.
+A few notes about other aspects of this Dockerfile:
+
+* I only included a minimal set of OS dependencies here. If this is an established production app, you'll most likely need to visit https://packages.debian.org, search for the Debian package names of the OS dependencies you need, including the ``-dev`` supplemental packages as needed, and add them either to ``RUN_DEPS`` or ``BUILD_DEPS`` in your Dockerfile.
+* Adding ``--no-cache-dir`` to the ``pip install`` command saves a additional disk space, as this prevents ``pip`` from `caching downloads <https://pip.pypa.io/en/stable/reference/pip_install/#caching>`_ and `caching wheels <https://pip.pypa.io/en/stable/reference/pip_install/#wheel-cache>`_ locally. Since you won't need to install requirements again after the Docker image has been created, this can be added to the ``pip install`` command. Thanks Hemanth Kumar for this tip!
+* uWSGI contains a lot of optimizations for running many apps from the same uWSGI process. These optimizations aren't really needed when running a single app in a Docker container, and can `cause issues <https://discuss.newrelic.com/t/newrelic-agent-produces-system-error/43446/2>`_ when used with certain 3rd-party packages. I've added ``UWSGI_LAZY_APPS=1`` and ``UWSGI_WSGI_ENV_BEHAVIOR=holy`` to the uWSGI configuration to provide a more stable uWSGI experience (the latter will be the default in the next uWSGI release).
+* The ``UWSGI_HTTP_AUTO_CHUNKED`` and ``UWSGI_HTTP_KEEPALIVE`` options to uWSGI are needed in the event the container will be hosted behind an Amazon Elastic Load Balancer (ELB), because Django doesn't set a valid ``Content-Length`` header by default, unless the ``ConditionalGetMiddleware`` is enabled. See `the note <http://uwsgi-docs.readthedocs.io/en/latest/HTTP.html#can-i-use-uwsgi-s-http-capabilities-in-production>`_ at the end of the uWSGI documentation on HTTP support for further detail.
 
 
 Requirements and Settings Files
@@ -276,11 +281,3 @@ Summary
 -------
 
 That concludes this high-level introduction to containerizing your Python/Django app for hosting on AWS Elastic Beanstalk (EB), Elastic Container Service (ECS), or elsewhere. Each application and Dockerfile will be slightly different, but I hope this provides a good starting point for your containers. Shameless plug: if you're looking for a simple (and at least temporarily free) way to test your Docker containers on AWS using an Elastic Beanstalk Multicontainer Docker environment or the Elastic Container Service, check out Caktus' very own `AWS Web Stacks <https://github.com/caktus/aws-web-stacks>`_. Good luck!
-
-**Update 1 (March 31, 2017):** There is no need for ``depends_on`` in container definitions that already include ``links``. This has been removed. Thanks Anderson Lima for the tip!
-
-**Update 2 (March 31, 2017):** Adding ``--no-cache-dir`` to the ``pip install`` command saves a additional disk space, as this prevents ``pip`` from `caching downloads <https://pip.pypa.io/en/stable/reference/pip_install/#caching>`_ and `caching wheels <https://pip.pypa.io/en/stable/reference/pip_install/#wheel-cache>`_ locally. Since you won't need to install requirements again after the Docker image has been created, this can be added to the ``pip install`` command. The post has been updated. Thanks Hemanth Kumar for the tip!
-
-**Update 3 (May 30, 2017):** uWSGI contains a lot of optimizations for running many apps from the same uWSGI process. These optimizations aren't really needed when running a single app in a Docker container, and can `cause issues <https://discuss.newrelic.com/t/newrelic-agent-produces-system-error/43446/2>`_ when used with certain 3rd-party packages. I've added ``UWSGI_LAZY_APPS=1`` and ``UWSGI_WSGI_ENV_BEHAVIOR=holy`` to the uWSGI configuration to provide a more stable uWSGI experience (the latter will be the default in the next uWSGI release).
-
-**Update 4 (March 29, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version includes a number of other minor improvements, including a less-magical approach to installing (and removing) system dependencies, better-documented uWSGI settings, a list of the requirements and settings you'll need to match this Dockerfile, support for static file serving via uWSGI (including hashed filenames and cache-forever headers), and an accompanying `GitHub repository <https://github.com/tobiasmcnulty/dockerfile_post/>`_.

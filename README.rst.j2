@@ -6,7 +6,7 @@ This is a DRAFT (possibly including untested, yet-to-be released) edits to the b
 A Production-ready Dockerfile for Your Python/Django App
 ========================================================
 
-**Update (April 8, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version includes a number of other minor improvements, including a less-magical approach to installing (and removing) system dependencies, better-documented uWSGI settings, a list of the requirements and settings you'll need to match this Dockerfile, support for static file serving via uWSGI (including hashed filenames and cache-forever headers), and an accompanying `GitHub repository <https://github.com/caktus/dockerfile_post/>`_.
+**Update (April 8, 2019):** I updated this post for Python 3.7 and to use the "slim" (Debian-based) Docker image. This version of my post includes a number of other minor improvements, including a less-magical approach to installing (and removing) system dependencies, better-documented uWSGI settings, a list of the requirements and settings you'll need to match this Dockerfile, support for static file serving via uWSGI (including hashed filenames and cache-forever headers), and an accompanying `GitHub repository <https://github.com/caktus/dockerfile_post/>`_.
 
 Docker has matured a lot since it was released. We've been watching it closely at Caktus, and have been thrilled by the adoption -- both by the community and by service providers. As a team of Python and Django developers, we're always searching for best of breed deployment tools. Docker is a clear fit for packaging the underlying code for many projects, including the Python and Django apps we build at Caktus.
 

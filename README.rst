@@ -220,7 +220,7 @@ To run a complete copy of production services locally, you can use `Docker Compo
 
 .. code-block:: yaml
 
-    version: '2'
+    version: "2"
 
     services:
       db:
@@ -229,7 +229,7 @@ To run a complete copy of production services locally, you can use `Docker Compo
           POSTGRES_USER: app_user
           POSTGRES_PASSWORD: changeme
         restart: always
-        image: postgres:11.2
+        image: postgres:12
         expose:
           - "5432"
       app:

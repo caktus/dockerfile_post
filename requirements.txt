@@ -1,4 +1,4 @@
-Django>=2.2rc1,<2.3
+Django>=2.2,<2.3
 uwsgi>=2.0,<2.1
 dj-database-url>=0.5,<0.6
 # Prevent pip from installing the binary wheel for psycopg2; see:

@@ -120,7 +120,7 @@ Requirements and Settings Files
 
 Production-ready requirements and settings files are outside the scope of this post, but you'll need to include a few things in your requirements file(s), if they're not there already::
 
-    Django>=2.2rc1,<2.3
+    Django>=2.2,<2.3
     uwsgi>=2.0,<2.1
     dj-database-url>=0.5,<0.6
     # Prevent pip from installing the binary wheel for psycopg2; see:

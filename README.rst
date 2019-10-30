@@ -130,9 +130,7 @@ Production-ready requirements and settings files are outside the scope of this p
     Django>=2.2,<2.3
     uwsgi>=2.0,<2.1
     dj-database-url>=0.5,<0.6
-    # Prevent pip from installing the binary wheel for psycopg2; see:
-    # http://initd.org/psycopg/docs/install.html#disabling-wheel-packages-for-psycopg-2-7
-    psycopg2>=2.7,<2.8 --no-binary psycopg2
+    psycopg2>=2.8,<2.9
 
 I didn't pin these to specific versions here to help future-proof this post somewhat, but you'll likely want to pin these (and other) requirements to specific versions so things don't suddenly start breaking in production. Of course, you don't have to use any of these packages, but you'll need to adjust the corresponding code elsewhere in this post if you don't.
 

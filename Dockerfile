@@ -7,9 +7,9 @@ FROM python:3.7-slim
 # they were clobbered by a parent image.
 RUN set -ex \
     && RUN_DEPS=" \
-        libpcre3 \
-        mime-support \
-        postgresql-client \
+    libpcre3 \
+    mime-support \
+    postgresql-client \
     " \
     && seq 1 8 | xargs -I{} mkdir -p /usr/share/man/man{} \
     && apt-get update && apt-get install -y --no-install-recommends $RUN_DEPS \
@@ -18,21 +18,19 @@ RUN set -ex \
 # Copy in your requirements file
 ADD requirements.txt /requirements.txt
 
-# OR, if you’re using a directory for your requirements, copy everything (comment out the above and uncomment this if so):
+# OR, if you're using a directory for your requirements, copy everything (comment out the above and uncomment this if so):
 # ADD requirements /requirements
 
 # Install build deps, then run `pip install`, then remove unneeded build deps all in a single step.
 # Correct the path to your production requirements file, if needed.
 RUN set -ex \
     && BUILD_DEPS=" \
-        build-essential \
-        libpcre3-dev \
-        libpq-dev \
+    build-essential \
+    libpcre3-dev \
+    libpq-dev \
     " \
     && apt-get update && apt-get install -y --no-install-recommends $BUILD_DEPS \
-    && python3.7 -m venv /venv \
-    && /venv/bin/pip install -U pip \
-    && /venv/bin/pip install --no-cache-dir -r /requirements.txt \
+    && pip install --no-cache-dir -r /requirements.txt \
     \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $BUILD_DEPS \
     && rm -rf /var/lib/apt/lists/*
@@ -49,13 +47,13 @@ EXPOSE 8000
 ENV DJANGO_SETTINGS_MODULE=my_project.settings.deploy
 
 # Call collectstatic (customize the following line with the minimal environment variables needed for manage.py to run):
-RUN DATABASE_URL='' /venv/bin/python manage.py collectstatic --noinput
+RUN DATABASE_URL='' python manage.py collectstatic --noinput
 
 # Tell uWSGI where to find your wsgi file (change this):
 ENV UWSGI_WSGI_FILE=my_project/wsgi.py
 
 # Base uWSGI configuration (you shouldn't need to change these):
-ENV UWSGI_VIRTUALENV=/venv UWSGI_HTTP=:8000 UWSGI_MASTER=1 UWSGI_HTTP_AUTO_CHUNKED=1 UWSGI_HTTP_KEEPALIVE=1 UWSGI_UID=1000 UWSGI_GID=2000 UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy
+ENV UWSGI_HTTP=:8000 UWSGI_MASTER=1 UWSGI_HTTP_AUTO_CHUNKED=1 UWSGI_HTTP_KEEPALIVE=1 UWSGI_LAZY_APPS=1 UWSGI_UID=1000 UWSGI_GID=2000 UWSGI_WSGI_ENV_BEHAVIOR=holy
 
 # Number of uWSGI workers and threads per worker (customize as needed):
 ENV UWSGI_WORKERS=2 UWSGI_THREADS=4
@@ -70,4 +68,4 @@ ENV UWSGI_ROUTE_HOST="^(?!localhost:8000$) break:400"
 ENTRYPOINT ["/code/docker-entrypoint.sh"]
 
 # Start uWSGI
-CMD ["/venv/bin/uwsgi", "--show-config"]
+CMD ["uwsgi", "--show-config"]

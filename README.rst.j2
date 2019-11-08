@@ -30,86 +30,14 @@ The Dockerfile
 Without further ado, here's a production-ready ``Dockerfile`` you can use as a starting point for your project (it should be added in your top level project directory, next to the ``manage.py`` script provided by your Django project):
 
 .. code-block:: docker
-
-    FROM python:3.7-slim
-
-    # Create a group and user to run our app
-    ARG APP_USER=appuser
-    RUN groupadd -r ${APP_USER} && useradd --no-log-init -r -g ${APP_USER} ${APP_USER}
-
-    # Install packages needed to run your application (not build deps):
-    #   mime-support -- for mime types when serving static files
-    #   postgresql-client -- for running database commands
-    # We need to recreate the /usr/share/man/man{1..8} directories first because
-    # they were clobbered by a parent image.
-    RUN set -ex \
-        && RUN_DEPS=" \
-        libpcre3 \
-        mime-support \
-        postgresql-client \
-        " \
-        && seq 1 8 | xargs -I{} mkdir -p /usr/share/man/man{} \
-        && apt-get update && apt-get install -y --no-install-recommends $RUN_DEPS \
-        && rm -rf /var/lib/apt/lists/*
-
-    # Copy in your requirements file
-    ADD requirements.txt /requirements.txt
-
-    # OR, if you're using a directory for your requirements, copy everything (comment out the above and uncomment this if so):
-    # ADD requirements /requirements
-
-    # Install build deps, then run `pip install`, then remove unneeded build deps all in a single step.
-    # Correct the path to your production requirements file, if needed.
-    RUN set -ex \
-        && BUILD_DEPS=" \
-        build-essential \
-        libpcre3-dev \
-        libpq-dev \
-        " \
-        && apt-get update && apt-get install -y --no-install-recommends $BUILD_DEPS \
-        && pip install --no-cache-dir -r /requirements.txt \
-        \
-        && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $BUILD_DEPS \
-        && rm -rf /var/lib/apt/lists/*
-
-    # Copy your application code to the container (make sure you create a .dockerignore file if any large files or directories should be excluded)
-    RUN mkdir /code/
-    WORKDIR /code/
-    ADD . /code/
-
-    # uWSGI will listen on this port
-    EXPOSE 8000
-
-    # Add any static environment variables needed by Django or your settings file here:
-    ENV DJANGO_SETTINGS_MODULE=my_project.settings.deploy
-
-    # Call collectstatic (customize the following line with the minimal environment variables needed for manage.py to run):
-    RUN DATABASE_URL='' python manage.py collectstatic --noinput
-
-    # Tell uWSGI where to find your wsgi file (change this):
-    ENV UWSGI_WSGI_FILE=my_project/wsgi.py
-
-    # Base uWSGI configuration (you shouldn't need to change these):
-    ENV UWSGI_HTTP=:8000 UWSGI_MASTER=1 UWSGI_HTTP_AUTO_CHUNKED=1 UWSGI_HTTP_KEEPALIVE=1 UWSGI_LAZY_APPS=1 UWSGI_WSGI_ENV_BEHAVIOR=holy
-
-    # Number of uWSGI workers and threads per worker (customize as needed):
-    ENV UWSGI_WORKERS=2 UWSGI_THREADS=4
-
-    # uWSGI static file serving configuration (customize or comment out if not needed):
-    ENV UWSGI_STATIC_MAP="/static/=/code/static/" UWSGI_STATIC_EXPIRES_URI="/static/.*\.[a-f0-9]{12,}\.(css|js|png|jpg|jpeg|gif|ico|woff|ttf|otf|svg|scss|map|txt) 315360000"
-
-    # Deny invalid hosts before they get to Django (uncomment and change to your hostname(s)):
-    # ENV UWSGI_ROUTE_HOST="^(?!localhost:8000$) break:400"
-
-    # Change to a non-root user
-    USER ${APP_USER}:${APP_USER}
-
-    # Uncomment after creating your docker-entrypoint.sh
-    # ENTRYPOINT ["/code/docker-entrypoint.sh"]
-
-    # Start uWSGI
-    CMD ["uwsgi", "--show-config"]
-
+{# re-comment out the lines that we've uncommented in the sample files, for testing purposes -#}
+{% filter replace("ENTRYPOINT", "# ENTRYPOINT") -%}
+{% filter replace("ENV UWSGI_ROUTE_HOST", "# ENV UWSGI_ROUTE_HOST") -%}
+{% filter indent(width=4) %}
+{% include "Dockerfile" %}
+{%- endfilter %}
+{%- endfilter %}
+{%- endfilter %}
 We extend from the "slim" flavor of the official Docker image for Python 3.7, install a few dependencies for running our application (i.e., that we want to keep in the final version of the image), copy the folder containing our requirements files to the container, and then, in a single line, (a) install the build dependencies needed, (b) ``pip install`` the requirements themselves (edit this line to match the location of your requirements file, if needed), (c) remove the C compiler and any other OS packages no longer needed, and (d) remove the package lists since they're no longer needed. It's important to keep this all on one line so that Docker will cache the entire operation as a single layer.
 
 Next, we copy our application code to the image, set some default environment variables, and run ``collectstatic``. Be sure to change the values for ``DJANGO_SETTINGS_MODULE`` and ``UWSGI_WSGI_FILE`` to the correct paths for your application (note that the former requires a Python package path, while the latter requires a file system path).
@@ -126,37 +54,17 @@ Requirements and Settings Files
 -------------------------------
 
 Production-ready requirements and settings files are outside the scope of this post, but you'll need to include a few things in your requirements file(s), if they're not there already::
-
-    Django>=2.2,<2.3
-    uwsgi>=2.0,<2.1
-    dj-database-url>=0.5,<0.6
-    psycopg2>=2.8,<2.9
-
+{% filter indent(width=4) %}
+{% include "requirements.txt" %}
+{%- endfilter %}
 I didn't pin these to specific versions here to help future-proof this post somewhat, but you'll likely want to pin these (and other) requirements to specific versions so things don't suddenly start breaking in production. Of course, you don't have to use any of these packages, but you'll need to adjust the corresponding code elsewhere in this post if you don't.
 
 My ``deploy.py`` settings file looks like this:
 
 .. code-block:: python
-
-    import os
-
-    import dj_database_url
-
-    from . import *  # noqa: F403
-
-    # This is NOT a complete production settings file. For more, see:
-    # See https://docs.djangoproject.com/en/dev/howto/deployment/checklist/
-
-    DEBUG = False
-
-    ALLOWED_HOSTS = ['localhost']
-
-    DATABASES['default'] = dj_database_url.config(conn_max_age=600)  # noqa: F405
-
-    STATIC_ROOT = os.path.join(BASE_DIR, 'static')  # noqa: F405
-
-    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
-
+{% filter indent(width=4) %}
+{% include "my_project/settings/deploy.py" %}
+{%- endfilter %}
 This bears repeating: This is **not** a production-ready settings file, and you should review `the checklist <https://docs.djangoproject.com/en/dev/howto/deployment/checklist/>`_ in the Django docs (and run ``python manage.py check --deploy --settings=my_project.settings.deploy``) to ensure you've properly secured your production settings file.
 
 
@@ -184,23 +92,9 @@ Running Commands During Container Start-Up
 As a final step, I recommend creating an ``ENTRYPOINT`` script to run commands as needed during container start-up. This will let us accomplish any number of things, such as making sure Postgres is available or running ``migrate`` during container start-up. Save the following to a file named ``docker-entrypoint.sh`` in the same directory as your ``Dockerfile``:
 
 .. code-block:: bash
-
-    #!/bin/sh
-    set -e
-
-    until psql $DATABASE_URL -c '\l'; do
-        >&2 echo "Postgres is unavailable - sleeping"
-        sleep 1
-    done
-
-    >&2 echo "Postgres is up - continuing"
-
-    if [ "x$DJANGO_MANAGEPY_MIGRATE" = 'xon' ]; then
-        python manage.py migrate --noinput
-    fi
-
-    exec "$@"
-
+{% filter indent(width=4) %}
+{% include "docker-entrypoint.sh" %}
+{%- endfilter %}
 Make sure this file is executable, i.e.:
 
 .. code-block:: bash
@@ -224,31 +118,9 @@ To run a complete copy of production services locally, you can use `Docker Compo
 *This is intended for local testing of your production environment only, and will not save data from stateful services like Postgres upon container shutdown.*
 
 .. code-block:: yaml
-
-    version: "2"
-
-    services:
-      db:
-        environment:
-          POSTGRES_DB: app_db
-          POSTGRES_USER: app_user
-          POSTGRES_PASSWORD: changeme
-        restart: always
-        image: postgres:12
-        expose:
-          - "5432"
-      app:
-        environment:
-          DATABASE_URL: postgres://app_user:changeme@db/app_db
-          DJANGO_MANAGEPY_MIGRATE: "on"
-        build:
-          context: .
-          dockerfile: ./Dockerfile
-        links:
-          - db:db
-        ports:
-          - "8000:8000"
-
+{% filter indent(width=4) %}
+{% include "docker-compose.yml" %}
+{%- endfilter %}
 Copy this into a file named ``docker-compose.yml`` in the same directory as your ``Dockerfile``, and then run:
 
 .. code-block:: bash

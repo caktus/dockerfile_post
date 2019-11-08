@@ -9,7 +9,7 @@ done
 >&2 echo "Postgres is up - continuing"
 
 if [ "x$DJANGO_MANAGEPY_MIGRATE" = 'xon' ]; then
-    /venv/bin/python manage.py migrate --noinput
+    python manage.py migrate --noinput
 fi
 
 exec "$@"
